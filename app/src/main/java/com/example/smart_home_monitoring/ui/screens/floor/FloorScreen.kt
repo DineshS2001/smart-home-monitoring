@@ -39,6 +39,7 @@ import com.example.smart_home_monitoring.data.repository.DeviceRealtimeRepositor
 import com.example.smart_home_monitoring.ui.theme.SmarthomemonitoringTheme
 import com.example.smart_home_monitoring.ui.components.FloorGrid
 import com.example.smart_home_monitoring.ui.components.CameraMockCard
+import com.example.smart_home_monitoring.ui.components.LightScheduleCard
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -229,6 +230,35 @@ fun FloorScreen(
                 key = { device -> device.id }
             ) { device ->
                 when (device.type) {
+                    DeviceType.LIGHT -> {
+                        LightScheduleCard(
+                            device = device,
+                            onPowerChange = { newStatus ->
+                                repository.updateDeviceStatus(
+                                    device = device,
+                                    status = newStatus,
+                                    onError = { message ->
+                                        errorMessage = message
+                                    }
+                                )
+                            },
+                            onScheduleChange = {
+                                    enabled,
+                                    startHour,
+                                    endHour ->
+
+                                repository.updateLightSchedule(
+                                    deviceId = device.id,
+                                    enabled = enabled,
+                                    startHour = startHour,
+                                    endHour = endHour,
+                                    onError = { message ->
+                                        errorMessage = message
+                                    }
+                                )
+                            }
+                        )
+                    }
                     DeviceType.CAMERA -> {
                         CameraMockCard(
                             device = device,

@@ -1,4 +1,5 @@
 const { initializeApp, cert } = require("firebase-admin/app");
+
 const {
   getDatabase,
   ServerValue
@@ -7,7 +8,11 @@ const {
 const serviceAccount = require("./serviceAccountKey.json");
 
 const DATABASE_URL =
-  "https://smart-home-monitoring-36dc7-default-rtdb.asia-southeast1.firebasedatabase.app";
+  "https://smart-home-monitoring-36dc7-default-rtdb." +
+  "asia-southeast1.firebasedatabase.app";
+
+const SCHEDULE_TIME_ZONE = "Asia/Colombo";
+const SCHEDULE_CHECK_INTERVAL = 30 * 1000;
 
 initializeApp({
   credential: cert(serviceAccount),
@@ -18,14 +23,23 @@ const database = getDatabase();
 const devicesReference = database.ref("smartHome/devices");
 const alertsReference = database.ref("smartHome/alerts");
 
+const usageEventsReference =
+  database.ref("smartHome/usageEvents");
+
 const activeTimers = new Map();
 
-console.log("Smart Home safety worker is starting...");
+const previousStatuses = new Map();
+let statusTrackingInitialized = false;
+
+console.log("Smart Home backend worker is starting...");
+console.log(`Schedule time zone: ${SCHEDULE_TIME_ZONE}`);
 
 devicesReference.on(
   "value",
   (snapshot) => {
     const devices = snapshot.val() || {};
+
+    trackDeviceStatusChanges(devices);
 
     Object.entries(devices).forEach(([deviceId, device]) => {
       processSafetyDevice(deviceId, device);
@@ -35,6 +49,75 @@ devicesReference.on(
     console.error("Firebase listener failed:", error.message);
   }
 );
+
+function trackDeviceStatusChanges(devices) {
+  if (!statusTrackingInitialized) {
+    Object.entries(devices).forEach(([deviceId, device]) => {
+      previousStatuses.set(
+        deviceId,
+        device.status || "UNKNOWN"
+      );
+    });
+
+    statusTrackingInitialized = true;
+    console.log("Device usage tracking initialized");
+    return;
+  }
+
+  Object.entries(devices).forEach(([deviceId, device]) => {
+    const newStatus = device.status || "UNKNOWN";
+    const previousStatus = previousStatuses.get(deviceId);
+
+    previousStatuses.set(deviceId, newStatus);
+
+    if (
+      previousStatus !== undefined &&
+      previousStatus !== newStatus
+    ) {
+      recordUsageEvent(
+        deviceId,
+        device,
+        previousStatus,
+        newStatus
+      );
+    }
+  });
+
+  for (const deviceId of previousStatuses.keys()) {
+    if (!devices[deviceId]) {
+      previousStatuses.delete(deviceId);
+    }
+  }
+}
+
+async function recordUsageEvent(
+  deviceId,
+  device,
+  previousStatus,
+  newStatus
+) {
+  try {
+    await usageEventsReference.push({
+      deviceId,
+      deviceName: device.name || "Unknown Device",
+      deviceType: device.type || "UNKNOWN",
+      floorId: device.floorId || "",
+      previousStatus,
+      newStatus,
+      changedAt: ServerValue.TIMESTAMP
+    });
+
+    console.log(
+      `${device.name || deviceId}: usage event recorded ` +
+        `${previousStatus} → ${newStatus}`
+    );
+  } catch (error) {
+    console.error(
+      `${device.name || deviceId}: usage event failed:`,
+      error.message
+    );
+  }
+}
 
 function processSafetyDevice(deviceId, device) {
   if (device.type !== "IRON") {
@@ -114,7 +197,7 @@ async function performSafetyCutoff(deviceId, scheduledDevice) {
     });
 
     await alertsReference.push({
-      deviceId: deviceId,
+      deviceId,
       deviceName: latestDevice.name || "Safety Device",
       type: "SAFETY_CUTOFF",
       title: "Device automatically turned off",
@@ -136,12 +219,111 @@ async function performSafetyCutoff(deviceId, scheduledDevice) {
   }
 }
 
+function getCurrentScheduleHour() {
+  const hourText = new Intl.DateTimeFormat(
+    "en-US",
+    {
+      timeZone: SCHEDULE_TIME_ZONE,
+      hour: "2-digit",
+      hourCycle: "h23"
+    }
+  ).format(new Date());
+
+  return Number.parseInt(hourText, 10);
+}
+
+function isHourInsideSchedule(
+  currentHour,
+  startHour,
+  endHour
+) {
+  if (startHour === endHour) {
+    return false;
+  }
+
+  if (startHour < endHour) {
+    return (
+      currentHour >= startHour &&
+      currentHour < endHour
+    );
+  }
+
+  return (
+    currentHour >= startHour ||
+    currentHour < endHour
+  );
+}
+
+async function checkLightSchedules() {
+  try {
+    const snapshot = await devicesReference.get();
+    const devices = snapshot.val() || {};
+    const currentHour = getCurrentScheduleHour();
+
+    for (const [deviceId, device] of Object.entries(devices)) {
+      if (
+        device.type !== "LIGHT" ||
+        device.scheduleEnabled !== true
+      ) {
+        continue;
+      }
+
+      const startHour = Number(device.scheduleStartHour);
+      const endHour = Number(device.scheduleEndHour);
+
+      if (
+        !Number.isInteger(startHour) ||
+        !Number.isInteger(endHour)
+      ) {
+        console.error(
+          `${device.name || deviceId}: invalid schedule hours`
+        );
+
+        continue;
+      }
+
+      const shouldBeOn = isHourInsideSchedule(
+        currentHour,
+        startHour,
+        endHour
+      );
+
+      const requiredStatus = shouldBeOn ? "ON" : "OFF";
+
+      if (device.status !== requiredStatus) {
+        await devicesReference.child(deviceId).update({
+          status: requiredStatus,
+          lastScheduleActionAt: ServerValue.TIMESTAMP
+        });
+
+        console.log(
+          `${device.name || deviceId}: schedule changed status to ` +
+            `${requiredStatus} at ${currentHour}:00`
+        );
+      }
+    }
+  } catch (error) {
+    console.error(
+      "Light schedule check failed:",
+      error.message
+    );
+  }
+}
+
+const scheduleInterval = setInterval(
+  checkLightSchedules,
+  SCHEDULE_CHECK_INTERVAL
+);
+
+setTimeout(checkLightSchedules, 2000);
+
 process.on("SIGINT", () => {
-  console.log("\nStopping safety worker...");
+  console.log("\nStopping backend worker...");
 
   activeTimers.forEach((timer) => {
     clearTimeout(timer);
   });
 
+  clearInterval(scheduleInterval);
   process.exit(0);
 });

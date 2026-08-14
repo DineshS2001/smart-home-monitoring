@@ -63,7 +63,8 @@ private val sampleFloors = listOf(
 @Composable
 fun DashboardScreen(
     onFloorClick: (String) -> Unit = {},
-    onAlertsClick: () -> Unit = {}
+    onAlertsClick: () -> Unit = {},
+    onReportsClick: () -> Unit = {}
 ) {
     Scaffold(
         topBar = {
@@ -136,6 +137,15 @@ fun DashboardScreen(
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Text(text = "View Safety Alerts")
+                }
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                Button(
+                    onClick = onReportsClick,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text("View Usage Reports")
                 }
 
                 Spacer(modifier = Modifier.height(24.dp))

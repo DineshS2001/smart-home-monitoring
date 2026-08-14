@@ -130,6 +130,30 @@ class DeviceRealtimeRepository {
             }
     }
 
+    fun updateLightSchedule(
+        deviceId: String,
+        enabled: Boolean,
+        startHour: Int,
+        endHour: Int,
+        onError: (String) -> Unit = {}
+    ) {
+        val scheduleData = mapOf<String, Any>(
+            "scheduleEnabled" to enabled,
+            "scheduleStartHour" to startHour,
+            "scheduleEndHour" to endHour
+        )
+
+        devicesReference
+            .child(deviceId)
+            .updateChildren(scheduleData)
+            .addOnFailureListener { error ->
+                onError(
+                    error.message ?: "Unable to update light schedule"
+                )
+            }
+    }
+
+
     private fun initializeSwitchStates(device: SmartDevice) {
         val initialStates = mutableMapOf<String, Boolean>()
 
@@ -189,7 +213,18 @@ class DeviceRealtimeRepository {
                 ?.toInt()
                 ?: 1,
             switchStates = switchStates,
-            turnedOnAt = child("turnedOnAt").getValue(Long::class.java)
+            turnedOnAt = child("turnedOnAt").getValue(Long::class.java),
+            scheduleEnabled = child("scheduleEnabled")
+                .getValue(Boolean::class.java)
+                ?: false,
+            scheduleStartHour = child("scheduleStartHour")
+                .getValue(Long::class.java)
+                ?.toInt()
+                ?: 18,
+            scheduleEndHour = child("scheduleEndHour")
+                .getValue(Long::class.java)
+                ?.toInt()
+                ?: 6
         )
     }
 

@@ -12,5 +12,8 @@ data class SmartDevice(
     val maxOnDurationMinutes: Int? = null,
     val numberOfSwitches: Int = 1,
     val switchStates: Map<String, Boolean> = emptyMap(),
-    val turnedOnAt: Long? = null
+    val turnedOnAt: Long? = null,
+    val scheduleEnabled: Boolean = false,
+    val scheduleStartHour: Int = 18,
+    val scheduleEndHour: Int = 6
 )

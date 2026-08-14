@@ -16,6 +16,7 @@ import com.example.smart_home_monitoring.ui.screens.alerts.AlertsScreen
 import com.example.smart_home_monitoring.ui.screens.dashboard.DashboardScreen
 import com.example.smart_home_monitoring.ui.screens.floor.FloorScreen
 import com.example.smart_home_monitoring.ui.theme.SmarthomemonitoringTheme
+import com.example.smart_home_monitoring.ui.screens.reports.ReportsScreen
 
 class MainActivity : ComponentActivity() {
 
@@ -37,6 +38,10 @@ class MainActivity : ComponentActivity() {
                     mutableStateOf(false)
                 }
 
+                var showReports by rememberSaveable {
+                    mutableStateOf(false)
+                }
+
                 Surface(
                     color = MaterialTheme.colorScheme.background
                 ) {
@@ -53,6 +58,18 @@ class MainActivity : ComponentActivity() {
                             )
                         }
 
+                        showReports -> {
+                            BackHandler {
+                                showReports = false
+                            }
+
+                            ReportsScreen(
+                                onBackClick = {
+                                    showReports = false
+                                }
+                            )
+                        }
+
                         selectedFloorId == null -> {
                             DashboardScreen(
                                 onFloorClick = { floorId ->
@@ -60,6 +77,9 @@ class MainActivity : ComponentActivity() {
                                 },
                                 onAlertsClick = {
                                     showAlerts = true
+                                },
+                                onReportsClick = {
+                                    showReports = true
                                 }
                             )
                         }
