@@ -33,6 +33,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.example.smart_home_monitoring.data.model.UsageEvent
 import com.example.smart_home_monitoring.data.repository.UsageRepository
+import com.example.smart_home_monitoring.data.repository.FloorRepository
 import com.example.smart_home_monitoring.ui.theme.SmarthomemonitoringTheme
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -47,6 +48,10 @@ fun ReportsScreen(
         UsageRepository()
     }
 
+    val floorRepository = remember {
+        FloorRepository()
+    }
+
     var events by remember {
         mutableStateOf<List<UsageEvent>>(emptyList())
     }
@@ -59,8 +64,12 @@ fun ReportsScreen(
         mutableStateOf<String?>(null)
     }
 
+    var floorNames by remember {
+        mutableStateOf<Map<String, String>>(emptyMap())
+    }
+
     DisposableEffect(Unit) {
-        val listener = repository.observeUsageEvents(
+        val usageListener = repository.observeUsageEvents(
             onEventsChanged = { updatedEvents ->
                 events = updatedEvents
                 isLoading = false
@@ -72,8 +81,20 @@ fun ReportsScreen(
             }
         )
 
+        val floorListener = floorRepository.observeFloors(
+            onFloorsChanged = { floors ->
+                floorNames = floors.associate { floor ->
+                    floor.id to floor.name
+                }
+            },
+            onError = { message ->
+                errorMessage = message
+            }
+        )
+
         onDispose {
-            repository.removeUsageListener(listener)
+            repository.removeUsageListener(usageListener)
+            floorRepository.removeFloorListener(floorListener)
         }
     }
 
@@ -213,7 +234,11 @@ fun ReportsScreen(
                     event.id
                 }
             ) { event ->
-                UsageEventCard(event = event)
+                UsageEventCard(
+                    event = event,
+                    floorName = floorNames[event.floorId]
+                        ?: "Deleted or unavailable floor"
+                )
             }
 
             item {
@@ -258,7 +283,8 @@ private fun ReportSummaryCard(
 
 @Composable
 private fun UsageEventCard(
-    event: UsageEvent
+    event: UsageEvent,
+    floorName: String
 ) {
     val statusColor = when (event.newStatus) {
         "ON" -> Color(0xFF1B7F3A)
@@ -298,7 +324,7 @@ private fun UsageEventCard(
             Text(
                 text =
                     "${formatDeviceType(event.deviceType)} • " +
-                            formatFloorName(event.floorId),
+                            floorName,
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -320,15 +346,6 @@ private fun formatDeviceType(type: String): String {
         "IRON" -> "Safety outlet"
         "CAMERA" -> "Camera"
         else -> "Device"
-    }
-}
-
-private fun formatFloorName(floorId: String): String {
-    return when (floorId) {
-        "ground_floor" -> "Ground Floor"
-        "first_floor" -> "First Floor"
-        "outdoor" -> "Outdoor Area"
-        else -> "Unknown Floor"
     }
 }
 

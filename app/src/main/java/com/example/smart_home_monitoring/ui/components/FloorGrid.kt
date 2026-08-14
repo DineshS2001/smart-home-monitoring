@@ -1,5 +1,6 @@
 package com.example.smart_home_monitoring.ui.components
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -22,6 +23,7 @@ import com.example.smart_home_monitoring.data.model.SmartDevice
 
 @Composable
 fun FloorGrid(
+    floorName: String,
     devices: List<SmartDevice>,
     onDeviceClick: (SmartDevice) -> Unit
 ) {
@@ -30,19 +32,23 @@ fun FloorGrid(
         shape = RoundedCornerShape(20.dp),
         colors = CardDefaults.cardColors(
             containerColor = Color(0xFFF1EDF8)
+        ),
+        border = BorderStroke(
+            width = 2.dp,
+            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.35f)
         )
     ) {
         Column(
             modifier = Modifier.padding(14.dp)
         ) {
             Text(
-                text = "Interactive Floor Grid",
+                text = "$floorName - Abstract Floor Plan",
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold
             )
 
             Text(
-                text = "Tap a mapped device to control it",
+                text = "2 x 2 mapped layout - tap a device to control it",
                 modifier = Modifier.padding(
                     top = 2.dp,
                     bottom = 12.dp
@@ -74,6 +80,13 @@ fun FloorGrid(
                     }
                 }
             }
+
+            Text(
+                text = "Each outlined area represents a position in this floor plan.",
+                modifier = Modifier.padding(top = 8.dp),
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
         }
     }
 }
@@ -93,6 +106,10 @@ private fun GridCell(
             shape = RoundedCornerShape(14.dp),
             colors = CardDefaults.cardColors(
                 containerColor = Color(0xFFE4E1E8)
+            ),
+            border = BorderStroke(
+                width = 1.dp,
+                color = Color(0xFF8C8495)
             )
         ) {
             Column(
@@ -142,6 +159,10 @@ private fun GridCell(
         ),
         elevation = CardDefaults.cardElevation(
             defaultElevation = 2.dp
+        ),
+        border = BorderStroke(
+            width = 1.dp,
+            color = Color(0xFF8C8495)
         )
     ) {
         Column(

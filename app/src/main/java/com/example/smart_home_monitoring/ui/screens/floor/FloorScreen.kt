@@ -175,6 +175,7 @@ fun FloorScreen(
             if (!isLoading && devices.isNotEmpty()) {
                 item {
                     FloorGrid(
+                        floorName = floorName,
                         devices = devices,
                         onDeviceClick = { selectedDevice ->
                             val isControllable =
