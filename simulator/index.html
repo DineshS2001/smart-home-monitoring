@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+
+    <meta
+            name="viewport"
+            content="width=device-width, initial-scale=1.0"
+    >
+
+    <title>Smart Home Hardware Simulator</title>
+
+    <link rel="stylesheet" href="styles.css">
+</head>
+
+<body>
+<header class="page-header">
+    <div>
+        <p class="eyebrow">IoT Hardware Simulator</p>
+        <h1>Smart Home Monitoring</h1>
+        <p class="subtitle">
+            Live device states synchronized with Firebase
+        </p>
+    </div>
+
+    <div id="connection-status" class="connection-status connecting">
+        Connecting...
+    </div>
+</header>
+
+<main class="page-content">
+    <section class="overview-section">
+        <h2>System Overview</h2>
+
+        <div class="summary-grid">
+            <article class="summary-card">
+                <span class="summary-value" id="total-devices">0</span>
+                <span class="summary-label">Total devices</span>
+            </article>
+
+            <article class="summary-card active">
+                <span class="summary-value" id="active-devices">0</span>
+                <span class="summary-label">Active</span>
+            </article>
+
+            <article class="summary-card warning">
+                <span class="summary-value" id="warning-devices">0</span>
+                <span class="summary-label">Warnings</span>
+            </article>
+        </div>
+    </section>
+
+    <section class="devices-section">
+        <div class="section-heading">
+            <div>
+                <h2>Simulated Hardware</h2>
+
+                <p>
+                    Operate a switch here and watch the Android app update.
+                </p>
+            </div>
+
+            <select id="floor-filter" aria-label="Filter devices by floor">
+                <option value="all">All floors</option>
+                <option value="ground_floor">Ground Floor</option>
+                <option value="first_floor">First Floor</option>
+                <option value="outdoor">Outdoor Area</option>
+            </select>
+        </div>
+
+        <div id="error-message" class="error-message hidden"></div>
+
+        <div id="loading-message" class="loading-message">
+            Loading devices from Firebase...
+        </div>
+
+        <div id="device-grid" class="device-grid"></div>
+    </section>
+</main>
+
+<template id="device-card-template">
+    <article class="device-card">
+        <div class="device-card-header">
+            <div>
+                <p class="device-room"></p>
+                <h3 class="device-name"></h3>
+            </div>
+
+            <span class="device-status"></span>
+        </div>
+
+        <p class="device-type"></p>
+
+        <div class="device-controls"></div>
+    </article>
+</template>
+
+<script type="module" src="app.js"></script>
+</body>
+</html>
