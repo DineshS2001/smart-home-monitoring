@@ -1,6 +1,7 @@
 package com.example.smart_home_monitoring
 
 import android.os.Bundle
+import com.example.smart_home_monitoring.data.repository.FirebaseRepository
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
@@ -19,6 +20,8 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        val firebaseRepository = FirebaseRepository()
+        firebaseRepository.initializeSampleData()
 
         enableEdgeToEdge()
 
