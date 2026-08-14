@@ -202,7 +202,7 @@ fun FloorScreen(
                         device = device,
                         onStatusChange = { newStatus ->
                             repository.updateDeviceStatus(
-                                deviceId = device.id,
+                                device = device,
                                 status = newStatus,
                                 onError = { message ->
                                     errorMessage = message
@@ -285,6 +285,21 @@ private fun DeviceCard(
                         text = "Safety limit: ${device.maxOnDurationMinutes} minutes",
                         style = MaterialTheme.typography.labelMedium,
                         color = Color(0xFFB45309)
+                    )
+                }
+
+                if (
+                    device.type == DeviceType.IRON &&
+                    device.status == DeviceStatus.ON &&
+                    device.turnedOnAt != null
+                ) {
+                    Spacer(modifier = Modifier.height(4.dp))
+
+                    Text(
+                        text = "Safety timer is active",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.error,
+                        fontWeight = FontWeight.Bold
                     )
                 }
 

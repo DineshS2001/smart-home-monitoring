@@ -7,6 +7,7 @@ import com.google.firebase.database.DataSnapshot
 import com.google.firebase.database.DatabaseError
 import com.google.firebase.database.FirebaseDatabase
 import com.google.firebase.database.ValueEventListener
+import com.google.firebase.database.ServerValue
 
 class DeviceRealtimeRepository {
 
@@ -59,14 +60,25 @@ class DeviceRealtimeRepository {
     }
 
     fun updateDeviceStatus(
-        deviceId: String,
+        device: SmartDevice,
         status: DeviceStatus,
         onError: (String) -> Unit = {}
     ) {
+        val updates = mutableMapOf<String, Any?>(
+            "status" to status.name
+        )
+
+        if (device.type == DeviceType.IRON) {
+            updates["turnedOnAt"] = if (status == DeviceStatus.ON) {
+                ServerValue.TIMESTAMP
+            } else {
+                null
+            }
+        }
+
         devicesReference
-            .child(deviceId)
-            .child("status")
-            .setValue(status.name)
+            .child(device.id)
+            .updateChildren(updates)
             .addOnFailureListener { error ->
                 onError(error.message ?: "Unable to update device")
             }
@@ -176,7 +188,8 @@ class DeviceRealtimeRepository {
                 .getValue(Long::class.java)
                 ?.toInt()
                 ?: 1,
-            switchStates = switchStates
+            switchStates = switchStates,
+            turnedOnAt = child("turnedOnAt").getValue(Long::class.java)
         )
     }
 
