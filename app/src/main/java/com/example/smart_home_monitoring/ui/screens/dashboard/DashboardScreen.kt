@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -61,7 +62,8 @@ private val sampleFloors = listOf(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DashboardScreen(
-    onFloorClick: (String) -> Unit = {}
+    onFloorClick: (String) -> Unit = {},
+    onAlertsClick: () -> Unit = {}
 ) {
     Scaffold(
         topBar = {
@@ -72,6 +74,7 @@ fun DashboardScreen(
                             text = "Smart Home",
                             fontWeight = FontWeight.Bold
                         )
+
                         Text(
                             text = "Monitoring & Control",
                             style = MaterialTheme.typography.labelMedium,
@@ -126,6 +129,15 @@ fun DashboardScreen(
                     )
                 }
 
+                Spacer(modifier = Modifier.height(12.dp))
+
+                Button(
+                    onClick = onAlertsClick,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(text = "View Safety Alerts")
+                }
+
                 Spacer(modifier = Modifier.height(24.dp))
 
                 Text(
@@ -137,7 +149,9 @@ fun DashboardScreen(
 
             items(
                 items = sampleFloors,
-                key = { floor -> floor.id }
+                key = { floor ->
+                    floor.id
+                }
             ) { floor ->
                 FloorCard(
                     floor = floor,
@@ -223,7 +237,9 @@ private fun FloorCard(
             Spacer(modifier = Modifier.height(12.dp))
 
             Text(
-                text = "${floor.activeDevices} active • ${floor.totalDevices} devices",
+                text =
+                    "${floor.activeDevices} active • " +
+                            "${floor.totalDevices} devices",
                 style = MaterialTheme.typography.labelLarge,
                 color = MaterialTheme.colorScheme.primary
             )

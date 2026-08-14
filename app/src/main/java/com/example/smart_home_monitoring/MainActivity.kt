@@ -1,7 +1,6 @@
 package com.example.smart_home_monitoring
 
 import android.os.Bundle
-import com.example.smart_home_monitoring.data.repository.FirebaseRepository
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
@@ -12,6 +11,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import com.example.smart_home_monitoring.data.repository.FirebaseRepository
+import com.example.smart_home_monitoring.ui.screens.alerts.AlertsScreen
 import com.example.smart_home_monitoring.ui.screens.dashboard.DashboardScreen
 import com.example.smart_home_monitoring.ui.screens.floor.FloorScreen
 import com.example.smart_home_monitoring.ui.theme.SmarthomemonitoringTheme
@@ -20,6 +21,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
         val firebaseRepository = FirebaseRepository()
         firebaseRepository.initializeSampleData()
 
@@ -31,26 +33,49 @@ class MainActivity : ComponentActivity() {
                     mutableStateOf<String?>(null)
                 }
 
+                var showAlerts by rememberSaveable {
+                    mutableStateOf(false)
+                }
+
                 Surface(
                     color = MaterialTheme.colorScheme.background
                 ) {
-                    if (selectedFloorId == null) {
-                        DashboardScreen(
-                            onFloorClick = { floorId ->
-                                selectedFloorId = floorId
+                    when {
+                        showAlerts -> {
+                            BackHandler {
+                                showAlerts = false
                             }
-                        )
-                    } else {
-                        BackHandler {
-                            selectedFloorId = null
+
+                            AlertsScreen(
+                                onBackClick = {
+                                    showAlerts = false
+                                }
+                            )
                         }
 
-                        FloorScreen(
-                            floorId = selectedFloorId!!,
-                            onBackClick = {
+                        selectedFloorId == null -> {
+                            DashboardScreen(
+                                onFloorClick = { floorId ->
+                                    selectedFloorId = floorId
+                                },
+                                onAlertsClick = {
+                                    showAlerts = true
+                                }
+                            )
+                        }
+
+                        else -> {
+                            BackHandler {
                                 selectedFloorId = null
                             }
-                        )
+
+                            FloorScreen(
+                                floorId = selectedFloorId!!,
+                                onBackClick = {
+                                    selectedFloorId = null
+                                }
+                            )
+                        }
                     }
                 }
             }
