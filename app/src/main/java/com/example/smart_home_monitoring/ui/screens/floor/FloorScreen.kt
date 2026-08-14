@@ -13,6 +13,8 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Button
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
@@ -36,10 +38,12 @@ import com.example.smart_home_monitoring.data.model.DeviceStatus
 import com.example.smart_home_monitoring.data.model.DeviceType
 import com.example.smart_home_monitoring.data.model.SmartDevice
 import com.example.smart_home_monitoring.data.repository.DeviceRealtimeRepository
+import com.example.smart_home_monitoring.data.repository.FloorRepository
 import com.example.smart_home_monitoring.ui.theme.SmarthomemonitoringTheme
 import com.example.smart_home_monitoring.ui.components.FloorGrid
 import com.example.smart_home_monitoring.ui.components.CameraMockCard
 import com.example.smart_home_monitoring.ui.components.LightScheduleCard
+import com.example.smart_home_monitoring.ui.components.AddDeviceDialog
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -49,6 +53,10 @@ fun FloorScreen(
 ) {
     val repository = remember {
         DeviceRealtimeRepository()
+    }
+
+    val floorRepository = remember {
+        FloorRepository()
     }
 
     var devices by remember(floorId) {
@@ -63,8 +71,20 @@ fun FloorScreen(
         mutableStateOf<String?>(null)
     }
 
+    var floorName by remember(floorId) {
+        mutableStateOf("Floor")
+    }
+
+    var showAddDeviceDialog by remember(floorId) {
+        mutableStateOf(false)
+    }
+
+    var deviceToDelete by remember(floorId) {
+        mutableStateOf<SmartDevice?>(null)
+    }
+
     DisposableEffect(floorId) {
-        val listener = repository.observeDevicesForFloor(
+        val deviceListener = repository.observeDevicesForFloor(
             floorId = floorId,
             onDevicesChanged = { updatedDevices ->
                 devices = updatedDevices
@@ -77,12 +97,21 @@ fun FloorScreen(
             }
         )
 
+        val floorListener = floorRepository.observeFloors(
+            onFloorsChanged = { floors ->
+                floorName = floors.firstOrNull { it.id == floorId }?.name
+                    ?: "Floor"
+            },
+            onError = { message ->
+                errorMessage = message
+            }
+        )
+
         onDispose {
-            repository.removeDeviceListener(listener)
+            repository.removeDeviceListener(deviceListener)
+            floorRepository.removeFloorListener(floorListener)
         }
     }
-
-    val floorName = getFloorName(floorId)
 
     Scaffold(
         topBar = {
@@ -132,6 +161,15 @@ fun FloorScreen(
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                Button(
+                    onClick = { showAddDeviceDialog = true },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(text = "Add Appliance")
+                }
             }
 
             if (!isLoading && devices.isNotEmpty()) {
@@ -229,89 +267,102 @@ fun FloorScreen(
                 items = devices,
                 key = { device -> device.id }
             ) { device ->
-                when (device.type) {
-                    DeviceType.LIGHT -> {
-                        LightScheduleCard(
-                            device = device,
-                            onPowerChange = { newStatus ->
-                                repository.updateDeviceStatus(
-                                    device = device,
-                                    status = newStatus,
-                                    onError = { message ->
-                                        errorMessage = message
-                                    }
-                                )
-                            },
-                            onScheduleChange = {
-                                    enabled,
-                                    startHour,
-                                    endHour ->
+                Column {
+                    when (device.type) {
+                        DeviceType.LIGHT -> {
+                            LightScheduleCard(
+                                device = device,
+                                onPowerChange = { newStatus ->
+                                    repository.updateDeviceStatus(
+                                        device = device,
+                                        status = newStatus,
+                                        onError = { message ->
+                                            errorMessage = message
+                                        }
+                                    )
+                                },
+                                onScheduleChange = {
+                                        enabled,
+                                        startHour,
+                                        endHour ->
 
-                                repository.updateLightSchedule(
-                                    deviceId = device.id,
-                                    enabled = enabled,
-                                    startHour = startHour,
-                                    endHour = endHour,
-                                    onError = { message ->
-                                        errorMessage = message
-                                    }
-                                )
-                            }
-                        )
-                    }
-                    DeviceType.CAMERA -> {
-                        CameraMockCard(
-                            device = device,
-                            onStatusChange = { newStatus ->
-                                repository.updateDeviceStatus(
-                                    device = device,
-                                    status = newStatus,
-                                    onError = { message ->
-                                        errorMessage = message
-                                    }
-                                )
-                            }
-                        )
+                                    repository.updateLightSchedule(
+                                        deviceId = device.id,
+                                        enabled = enabled,
+                                        startHour = startHour,
+                                        endHour = endHour,
+                                        onError = { message ->
+                                            errorMessage = message
+                                        }
+                                    )
+                                }
+                            )
+                        }
+                        DeviceType.CAMERA -> {
+                            CameraMockCard(
+                                device = device,
+                                onStatusChange = { newStatus ->
+                                    repository.updateDeviceStatus(
+                                        device = device,
+                                        status = newStatus,
+                                        onError = { message ->
+                                            errorMessage = message
+                                        }
+                                    )
+                                }
+                            )
+                        }
+
+                        DeviceType.MULTI_SWITCH -> {
+                            MultiSwitchCard(
+                                device = device,
+                                onMasterSwitchChange = { isOn ->
+                                    repository.updateAllSwitches(
+                                        device = device,
+                                        isOn = isOn,
+                                        onError = { message ->
+                                            errorMessage = message
+                                        }
+                                    )
+                                },
+                                onIndividualSwitchChange = { switchKey, isOn ->
+                                    repository.updateIndividualSwitch(
+                                        device = device,
+                                        switchKey = switchKey,
+                                        isOn = isOn,
+                                        onError = { message ->
+                                            errorMessage = message
+                                        }
+                                    )
+                                }
+                            )
+                        }
+
+                        else -> {
+                            DeviceCard(
+                                device = device,
+                                onStatusChange = { newStatus ->
+                                    repository.updateDeviceStatus(
+                                        device = device,
+                                        status = newStatus,
+                                        onError = { message ->
+                                            errorMessage = message
+                                        }
+                                    )
+                                }
+                            )
+                        }
                     }
 
-                    DeviceType.MULTI_SWITCH -> {
-                        MultiSwitchCard(
-                            device = device,
-                            onMasterSwitchChange = { isOn ->
-                                repository.updateAllSwitches(
-                                    device = device,
-                                    isOn = isOn,
-                                    onError = { message ->
-                                        errorMessage = message
-                                    }
-                                )
-                            },
-                            onIndividualSwitchChange = { switchKey, isOn ->
-                                repository.updateIndividualSwitch(
-                                    device = device,
-                                    switchKey = switchKey,
-                                    isOn = isOn,
-                                    onError = { message ->
-                                        errorMessage = message
-                                    }
-                                )
-                            }
-                        )
-                    }
-
-                    else -> {
-                        DeviceCard(
-                            device = device,
-                            onStatusChange = { newStatus ->
-                                repository.updateDeviceStatus(
-                                    device = device,
-                                    status = newStatus,
-                                    onError = { message ->
-                                        errorMessage = message
-                                    }
-                                )
-                            }
-                        )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.End
+                    ) {
+                        TextButton(
+                            onClick = { deviceToDelete = device }
+                        ) {
+                            Text(text = "Remove appliance")
+                        }
                     }
                 }
             }
@@ -320,6 +371,76 @@ fun FloorScreen(
                 Spacer(modifier = Modifier.height(24.dp))
             }
         }
+    }
+
+    if (showAddDeviceDialog) {
+        AddDeviceDialog(
+            onDismiss = { showAddDeviceDialog = false },
+            onSave = {
+                    name,
+                    roomName,
+                    type,
+                    gridRow,
+                    gridColumn,
+                    maxOnDurationMinutes,
+                    numberOfSwitches ->
+
+                repository.addDevice(
+                    floorId = floorId,
+                    name = name,
+                    roomName = roomName,
+                    type = type,
+                    gridRow = gridRow,
+                    gridColumn = gridColumn,
+                    maxOnDurationMinutes = maxOnDurationMinutes,
+                    numberOfSwitches = numberOfSwitches,
+                    onSuccess = {
+                        showAddDeviceDialog = false
+                        errorMessage = null
+                    },
+                    onError = { message ->
+                        errorMessage = message
+                    }
+                )
+            }
+        )
+    }
+
+    deviceToDelete?.let { device ->
+        AlertDialog(
+            onDismissRequest = { deviceToDelete = null },
+            title = { Text(text = "Remove ${device.name}?") },
+            text = {
+                Text(
+                    text = "This appliance and its Firebase data will be deleted."
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        repository.deleteDevice(
+                            deviceId = device.id,
+                            onSuccess = {
+                                deviceToDelete = null
+                                errorMessage = null
+                            },
+                            onError = { message ->
+                                errorMessage = message
+                            }
+                        )
+                    }
+                ) {
+                    Text(text = "Remove")
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = { deviceToDelete = null }
+                ) {
+                    Text(text = "Cancel")
+                }
+            }
+        )
     }
 }
 
@@ -533,15 +654,6 @@ private fun formatDeviceType(type: DeviceType): String {
         DeviceType.LIGHT -> "Light"
         DeviceType.IRON -> "Safety outlet"
         DeviceType.CAMERA -> "Camera"
-    }
-}
-
-private fun getFloorName(floorId: String): String {
-    return when (floorId) {
-        "ground_floor" -> "Ground Floor"
-        "first_floor" -> "First Floor"
-        "outdoor" -> "Outdoor Area"
-        else -> "Unknown Floor"
     }
 }
 

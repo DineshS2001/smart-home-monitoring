@@ -26,6 +26,7 @@ const firebaseApp = initializeApp(firebaseConfig);
 const database = getDatabase(firebaseApp);
 
 const devicesReference = ref(database, "smartHome/devices");
+const floorsReference = ref(database, "smartHome/floors");
 const connectionReference = ref(database, ".info/connected");
 
 const connectionStatus = document.querySelector("#connection-status");
@@ -40,7 +41,28 @@ const activeDevicesElement = document.querySelector("#active-devices");
 const warningDevicesElement = document.querySelector("#warning-devices");
 
 let allDevices = [];
+let allFloors = [];
 let selectedFloor = "all";
+
+onValue(
+    floorsReference,
+    (snapshot) => {
+        const floorObject = snapshot.val() || {};
+
+        allFloors = Object.entries(floorObject).map(
+            ([floorId, floor]) => ({
+                ...floor,
+                id: floor.id || floorId
+            })
+        );
+
+        renderFloorFilter();
+        renderSimulator();
+    },
+    (error) => {
+        showError(`Unable to load Firebase floors: ${error.message}`);
+    }
+);
 
 onValue(connectionReference, (snapshot) => {
     const isConnected = snapshot.val() === true;
@@ -85,6 +107,38 @@ floorFilter.addEventListener("change", (event) => {
     selectedFloor = event.target.value;
     renderSimulator();
 });
+
+function renderFloorFilter() {
+    const selectedFloorStillExists =
+        selectedFloor === "all" ||
+        allFloors.some((floor) => floor.id === selectedFloor);
+
+    if (!selectedFloorStillExists) {
+        selectedFloor = "all";
+    }
+
+    floorFilter.replaceChildren();
+
+    const allOption = document.createElement("option");
+    allOption.value = "all";
+    allOption.textContent = "All floors";
+    floorFilter.appendChild(allOption);
+
+    allFloors
+        .sort((first, second) =>
+            String(first.name || "").localeCompare(
+                String(second.name || "")
+            )
+        )
+        .forEach((floor) => {
+            const option = document.createElement("option");
+            option.value = floor.id;
+            option.textContent = floor.name || "Unnamed floor";
+            floorFilter.appendChild(option);
+        });
+
+    floorFilter.value = selectedFloor;
+}
 
 function renderSimulator() {
     updateSummary();

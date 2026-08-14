@@ -59,6 +59,75 @@ class DeviceRealtimeRepository {
         devicesReference.removeEventListener(listener)
     }
 
+    fun addDevice(
+        floorId: String,
+        name: String,
+        roomName: String,
+        type: DeviceType,
+        gridRow: Int,
+        gridColumn: Int,
+        maxOnDurationMinutes: Int = 15,
+        numberOfSwitches: Int = 3,
+        onSuccess: () -> Unit = {},
+        onError: (String) -> Unit = {}
+    ) {
+        val deviceId = devicesReference.push().key
+        if (deviceId == null) {
+            onError("Unable to create a device ID")
+            return
+        }
+
+        val deviceData = mutableMapOf<String, Any>(
+            "id" to deviceId,
+            "name" to name.trim(),
+            "roomName" to roomName.trim(),
+            "floorId" to floorId,
+            "type" to type.name,
+            "status" to DeviceStatus.OFF.name,
+            "gridRow" to gridRow,
+            "gridColumn" to gridColumn,
+            "numberOfSwitches" to if (type == DeviceType.MULTI_SWITCH) {
+                numberOfSwitches
+            } else {
+                1
+            }
+        )
+
+        if (type == DeviceType.IRON) {
+            deviceData["maxOnDurationMinutes"] = maxOnDurationMinutes
+        }
+
+        if (type == DeviceType.LIGHT) {
+            deviceData["scheduleEnabled"] = false
+            deviceData["scheduleStartHour"] = 18
+            deviceData["scheduleEndHour"] = 6
+        }
+
+        if (type == DeviceType.MULTI_SWITCH) {
+            deviceData["switches"] = (1..numberOfSwitches).associate { number ->
+                "switch_$number" to false
+            }
+        }
+
+        devicesReference.child(deviceId).setValue(deviceData)
+            .addOnSuccessListener { onSuccess() }
+            .addOnFailureListener { error ->
+                onError(error.message ?: "Unable to add appliance")
+            }
+    }
+
+    fun deleteDevice(
+        deviceId: String,
+        onSuccess: () -> Unit = {},
+        onError: (String) -> Unit = {}
+    ) {
+        devicesReference.child(deviceId).removeValue()
+            .addOnSuccessListener { onSuccess() }
+            .addOnFailureListener { error ->
+                onError(error.message ?: "Unable to remove appliance")
+            }
+    }
+
     fun updateDeviceStatus(
         device: SmartDevice,
         status: DeviceStatus,

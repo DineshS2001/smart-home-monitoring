@@ -15,6 +15,7 @@ import com.example.smart_home_monitoring.data.repository.FirebaseRepository
 import com.example.smart_home_monitoring.ui.screens.alerts.AlertsScreen
 import com.example.smart_home_monitoring.ui.screens.dashboard.DashboardScreen
 import com.example.smart_home_monitoring.ui.screens.floor.FloorScreen
+import com.example.smart_home_monitoring.ui.screens.floors.ManageFloorsScreen
 import com.example.smart_home_monitoring.ui.theme.SmarthomemonitoringTheme
 import com.example.smart_home_monitoring.ui.screens.reports.ReportsScreen
 
@@ -39,6 +40,10 @@ class MainActivity : ComponentActivity() {
                 }
 
                 var showReports by rememberSaveable {
+                    mutableStateOf(false)
+                }
+
+                var showManageFloors by rememberSaveable {
                     mutableStateOf(false)
                 }
 
@@ -70,6 +75,18 @@ class MainActivity : ComponentActivity() {
                             )
                         }
 
+                        showManageFloors -> {
+                            BackHandler {
+                                showManageFloors = false
+                            }
+
+                            ManageFloorsScreen(
+                                onBackClick = {
+                                    showManageFloors = false
+                                }
+                            )
+                        }
+
                         selectedFloorId == null -> {
                             DashboardScreen(
                                 onFloorClick = { floorId ->
@@ -80,6 +97,9 @@ class MainActivity : ComponentActivity() {
                                 },
                                 onReportsClick = {
                                     showReports = true
+                                },
+                                onManageFloorsClick = {
+                                    showManageFloors = true
                                 }
                             )
                         }
