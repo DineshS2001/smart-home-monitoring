@@ -13,6 +13,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
@@ -20,9 +21,11 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -32,6 +35,7 @@ import androidx.compose.ui.unit.dp
 import com.example.smart_home_monitoring.data.model.DeviceStatus
 import com.example.smart_home_monitoring.data.model.DeviceType
 import com.example.smart_home_monitoring.data.model.SmartDevice
+import com.example.smart_home_monitoring.data.repository.DeviceRealtimeRepository
 import com.example.smart_home_monitoring.ui.theme.SmarthomemonitoringTheme
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -40,8 +44,42 @@ fun FloorScreen(
     floorId: String,
     onBackClick: () -> Unit
 ) {
+    val repository = remember {
+        DeviceRealtimeRepository()
+    }
+
+    var devices by remember(floorId) {
+        mutableStateOf<List<SmartDevice>>(emptyList())
+    }
+
+    var isLoading by remember(floorId) {
+        mutableStateOf(true)
+    }
+
+    var errorMessage by remember(floorId) {
+        mutableStateOf<String?>(null)
+    }
+
+    DisposableEffect(floorId) {
+        val listener = repository.observeDevicesForFloor(
+            floorId = floorId,
+            onDevicesChanged = { updatedDevices ->
+                devices = updatedDevices
+                isLoading = false
+                errorMessage = null
+            },
+            onError = { message ->
+                errorMessage = message
+                isLoading = false
+            }
+        )
+
+        onDispose {
+            repository.removeDeviceListener(listener)
+        }
+    }
+
     val floorName = getFloorName(floorId)
-    val devices = getDevicesForFloor(floorId)
 
     Scaffold(
         topBar = {
@@ -52,6 +90,7 @@ fun FloorScreen(
                             text = floorName,
                             fontWeight = FontWeight.Bold
                         )
+
                         Text(
                             text = "${devices.size} smart devices",
                             style = MaterialTheme.typography.labelMedium,
@@ -86,17 +125,67 @@ fun FloorScreen(
                 Spacer(modifier = Modifier.height(4.dp))
 
                 Text(
-                    text = "Use the switches to control devices.",
+                    text = "Changes are synchronized with Firebase.",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
+            }
+
+            if (isLoading) {
+                item {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(32.dp),
+                        horizontalArrangement = Arrangement.Center
+                    ) {
+                        CircularProgressIndicator()
+                    }
+                }
+            }
+
+            if (errorMessage != null) {
+                item {
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.errorContainer
+                        )
+                    ) {
+                        Text(
+                            text = "Firebase error: $errorMessage",
+                            modifier = Modifier.padding(16.dp),
+                            color = MaterialTheme.colorScheme.onErrorContainer
+                        )
+                    }
+                }
+            }
+
+            if (!isLoading && errorMessage == null && devices.isEmpty()) {
+                item {
+                    Text(
+                        text = "No devices were found for this floor.",
+                        modifier = Modifier.padding(vertical = 24.dp)
+                    )
+                }
             }
 
             items(
                 items = devices,
                 key = { device -> device.id }
             ) { device ->
-                DeviceCard(device = device)
+                DeviceCard(
+                    device = device,
+                    onStatusChange = { newStatus ->
+                        repository.updateDeviceStatus(
+                            deviceId = device.id,
+                            status = newStatus,
+                            onError = { message ->
+                                errorMessage = message
+                            }
+                        )
+                    }
+                )
             }
 
             item {
@@ -108,24 +197,20 @@ fun FloorScreen(
 
 @Composable
 private fun DeviceCard(
-    device: SmartDevice
+    device: SmartDevice,
+    onStatusChange: (DeviceStatus) -> Unit
 ) {
-    var isOn by rememberSaveable(device.id) {
-        androidx.compose.runtime.mutableStateOf(
-            device.status == DeviceStatus.ON
-        )
-    }
+    val isOn = device.status == DeviceStatus.ON
 
-    val currentStatus = if (isOn) {
-        DeviceStatus.ON
-    } else {
-        DeviceStatus.OFF
-    }
+    val canControl =
+        device.status != DeviceStatus.ERROR &&
+                device.status != DeviceStatus.DISCONNECTED
 
-    val statusColor = if (isOn) {
-        Color(0xFF1B7F3A)
-    } else {
-        MaterialTheme.colorScheme.onSurfaceVariant
+    val statusColor = when (device.status) {
+        DeviceStatus.ON -> Color(0xFF1B7F3A)
+        DeviceStatus.OFF -> MaterialTheme.colorScheme.onSurfaceVariant
+        DeviceStatus.ERROR -> MaterialTheme.colorScheme.error
+        DeviceStatus.DISCONNECTED -> Color(0xFFB45309)
     }
 
     Card(
@@ -162,7 +247,7 @@ private fun DeviceCard(
                 Spacer(modifier = Modifier.height(8.dp))
 
                 Text(
-                    text = "${formatDeviceType(device.type)} • $currentStatus",
+                    text = "${formatDeviceType(device.type)} • ${device.status}",
                     style = MaterialTheme.typography.labelLarge,
                     color = statusColor,
                     fontWeight = FontWeight.SemiBold
@@ -190,8 +275,15 @@ private fun DeviceCard(
 
             Switch(
                 checked = isOn,
-                onCheckedChange = { newValue ->
-                    isOn = newValue
+                enabled = canControl,
+                onCheckedChange = { checked ->
+                    val newStatus = if (checked) {
+                        DeviceStatus.ON
+                    } else {
+                        DeviceStatus.OFF
+                    }
+
+                    onStatusChange(newStatus)
                 }
             )
         }
@@ -214,111 +306,6 @@ private fun getFloorName(floorId: String): String {
         "first_floor" -> "First Floor"
         "outdoor" -> "Outdoor Area"
         else -> "Unknown Floor"
-    }
-}
-
-private fun getDevicesForFloor(floorId: String): List<SmartDevice> {
-    return when (floorId) {
-        "ground_floor" -> listOf(
-            SmartDevice(
-                id = "living_room_light",
-                name = "Living Room Light",
-                roomName = "Living Room",
-                floorId = floorId,
-                type = DeviceType.LIGHT,
-                status = DeviceStatus.ON,
-                gridRow = 1,
-                gridColumn = 1
-            ),
-            SmartDevice(
-                id = "television_outlet",
-                name = "Television Outlet",
-                roomName = "Living Room",
-                floorId = floorId,
-                type = DeviceType.OUTLET,
-                status = DeviceStatus.OFF,
-                gridRow = 1,
-                gridColumn = 2
-            ),
-            SmartDevice(
-                id = "kitchen_switches",
-                name = "Kitchen Switch Unit",
-                roomName = "Kitchen",
-                floorId = floorId,
-                type = DeviceType.MULTI_SWITCH,
-                status = DeviceStatus.ON,
-                numberOfSwitches = 3,
-                gridRow = 2,
-                gridColumn = 1
-            ),
-            SmartDevice(
-                id = "clothing_iron",
-                name = "Clothing Iron",
-                roomName = "Utility Room",
-                floorId = floorId,
-                type = DeviceType.IRON,
-                status = DeviceStatus.OFF,
-                maxOnDurationMinutes = 15,
-                gridRow = 2,
-                gridColumn = 2
-            )
-        )
-
-        "first_floor" -> listOf(
-            SmartDevice(
-                id = "bedroom_light",
-                name = "Main Bedroom Light",
-                roomName = "Main Bedroom",
-                floorId = floorId,
-                type = DeviceType.LIGHT,
-                status = DeviceStatus.OFF
-            ),
-            SmartDevice(
-                id = "study_outlet",
-                name = "Study Room Outlet",
-                roomName = "Study Room",
-                floorId = floorId,
-                type = DeviceType.OUTLET,
-                status = DeviceStatus.ON
-            ),
-            SmartDevice(
-                id = "upstairs_camera",
-                name = "Hallway Camera",
-                roomName = "Upstairs Hallway",
-                floorId = floorId,
-                type = DeviceType.CAMERA,
-                status = DeviceStatus.ON
-            )
-        )
-
-        "outdoor" -> listOf(
-            SmartDevice(
-                id = "entrance_light",
-                name = "Entrance Light",
-                roomName = "Front Entrance",
-                floorId = floorId,
-                type = DeviceType.LIGHT,
-                status = DeviceStatus.ON
-            ),
-            SmartDevice(
-                id = "front_camera",
-                name = "Front Security Camera",
-                roomName = "Front Entrance",
-                floorId = floorId,
-                type = DeviceType.CAMERA,
-                status = DeviceStatus.ON
-            ),
-            SmartDevice(
-                id = "garden_outlet",
-                name = "Garden Outlet",
-                roomName = "Garden",
-                floorId = floorId,
-                type = DeviceType.OUTLET,
-                status = DeviceStatus.OFF
-            )
-        )
-
-        else -> emptyList()
     }
 }
 
