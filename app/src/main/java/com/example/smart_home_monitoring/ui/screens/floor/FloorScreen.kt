@@ -37,6 +37,7 @@ import com.example.smart_home_monitoring.data.model.DeviceType
 import com.example.smart_home_monitoring.data.model.SmartDevice
 import com.example.smart_home_monitoring.data.repository.DeviceRealtimeRepository
 import com.example.smart_home_monitoring.ui.theme.SmarthomemonitoringTheme
+import com.example.smart_home_monitoring.ui.components.FloorGrid
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -129,6 +130,58 @@ fun FloorScreen(
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
+            }
+
+            if (!isLoading && devices.isNotEmpty()) {
+                item {
+                    FloorGrid(
+                        devices = devices,
+                        onDeviceClick = { selectedDevice ->
+                            val isControllable =
+                                selectedDevice.status != DeviceStatus.ERROR &&
+                                        selectedDevice.status !=
+                                        DeviceStatus.DISCONNECTED
+
+                            if (isControllable) {
+                                if (
+                                    selectedDevice.type ==
+                                    DeviceType.MULTI_SWITCH
+                                ) {
+                                    val anySwitchOn =
+                                        selectedDevice.switchStates.values.any {
+                                            it
+                                        }
+
+                                    repository.updateAllSwitches(
+                                        device = selectedDevice,
+                                        isOn = !anySwitchOn,
+                                        onError = { message ->
+                                            errorMessage = message
+                                        }
+                                    )
+                                } else {
+                                    val newStatus =
+                                        if (
+                                            selectedDevice.status ==
+                                            DeviceStatus.ON
+                                        ) {
+                                            DeviceStatus.OFF
+                                        } else {
+                                            DeviceStatus.ON
+                                        }
+
+                                    repository.updateDeviceStatus(
+                                        device = selectedDevice,
+                                        status = newStatus,
+                                        onError = { message ->
+                                            errorMessage = message
+                                        }
+                                    )
+                                }
+                            }
+                        }
+                    )
+                }
             }
 
             if (isLoading) {
