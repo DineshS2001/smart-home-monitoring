@@ -1,15 +1,19 @@
+# Android Studio local files
+.idea/
 *.iml
-.gradle
-/local.properties
-/.idea/caches
-/.idea/libraries
-/.idea/modules.xml
-/.idea/workspace.xml
-/.idea/navEditor.xml
-/.idea/assetWizardSettings.xml
-.DS_Store
-/build
-/captures
-.externalNativeBuild
-.cxx
+
+# Gradle and local SDK
+.gradle/
 local.properties
+**/build/
+
+# Firebase Android configuration
+app/google-services.json
+
+# Backend dependencies and private credentials
+backend/node_modules/
+backend/serviceAccountKey.json
+
+# Operating-system files
+.DS_Store
+Thumbs.db
