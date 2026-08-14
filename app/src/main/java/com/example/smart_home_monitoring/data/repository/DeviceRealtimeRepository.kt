@@ -21,10 +21,20 @@ class DeviceRealtimeRepository {
     ): ValueEventListener {
         val listener = object : ValueEventListener {
             override fun onDataChange(snapshot: DataSnapshot) {
-                val devices = snapshot.children
-                    .mapNotNull { deviceSnapshot ->
-                        deviceSnapshot.toSmartDevice()
+                val allDevices = snapshot.children.mapNotNull { deviceSnapshot ->
+                    deviceSnapshot.toSmartDevice()
+                }
+
+                allDevices
+                    .filter { device ->
+                        device.type == DeviceType.MULTI_SWITCH &&
+                                device.switchStates.isEmpty()
                     }
+                    .forEach { device ->
+                        initializeSwitchStates(device)
+                    }
+
+                val floorDevices = allDevices
                     .filter { device ->
                         device.floorId == floorId
                     }
@@ -32,7 +42,7 @@ class DeviceRealtimeRepository {
                         device.name
                     }
 
-                onDevicesChanged(devices)
+                onDevicesChanged(floorDevices)
             }
 
             override fun onCancelled(error: DatabaseError) {
@@ -62,6 +72,65 @@ class DeviceRealtimeRepository {
             }
     }
 
+    fun updateIndividualSwitch(
+        device: SmartDevice,
+        switchKey: String,
+        isOn: Boolean,
+        onError: (String) -> Unit = {}
+    ) {
+        val newSwitchStates = device.switchStates.toMutableMap()
+        newSwitchStates[switchKey] = isOn
+
+        val deviceStatus = if (newSwitchStates.values.any { it }) {
+            DeviceStatus.ON
+        } else {
+            DeviceStatus.OFF
+        }
+
+        val updates = mapOf<String, Any>(
+            "${device.id}/switches/$switchKey" to isOn,
+            "${device.id}/status" to deviceStatus.name
+        )
+
+        devicesReference.updateChildren(updates)
+            .addOnFailureListener { error ->
+                onError(error.message ?: "Unable to update switch")
+            }
+    }
+
+    fun updateAllSwitches(
+        device: SmartDevice,
+        isOn: Boolean,
+        onError: (String) -> Unit = {}
+    ) {
+        val updates = mutableMapOf<String, Any>()
+
+        for (number in 1..device.numberOfSwitches) {
+            updates["${device.id}/switches/switch_$number"] = isOn
+        }
+
+        updates["${device.id}/status"] =
+            if (isOn) DeviceStatus.ON.name else DeviceStatus.OFF.name
+
+        devicesReference.updateChildren(updates)
+            .addOnFailureListener { error ->
+                onError(error.message ?: "Unable to update switches")
+            }
+    }
+
+    private fun initializeSwitchStates(device: SmartDevice) {
+        val initialStates = mutableMapOf<String, Boolean>()
+
+        for (number in 1..device.numberOfSwitches) {
+            initialStates["switch_$number"] = false
+        }
+
+        devicesReference
+            .child(device.id)
+            .child("switches")
+            .setValue(initialStates)
+    }
+
     private fun DataSnapshot.toSmartDevice(): SmartDevice? {
         val id = child("id").getValue(String::class.java)
             ?: key
@@ -81,6 +150,16 @@ class DeviceRealtimeRepository {
             DeviceStatus.valueOf(statusText)
         }.getOrDefault(DeviceStatus.ERROR)
 
+        val switchStates = child("switches")
+            .children
+            .associate { switchSnapshot ->
+                val switchName = switchSnapshot.key ?: "unknown"
+                val isOn =
+                    switchSnapshot.getValue(Boolean::class.java) ?: false
+
+                switchName to isOn
+            }
+
         return SmartDevice(
             id = id,
             name = child("name").getValue(String::class.java) ?: "Unknown Device",
@@ -96,7 +175,8 @@ class DeviceRealtimeRepository {
             numberOfSwitches = child("numberOfSwitches")
                 .getValue(Long::class.java)
                 ?.toInt()
-                ?: 1
+                ?: 1,
+            switchStates = switchStates
         )
     }
 

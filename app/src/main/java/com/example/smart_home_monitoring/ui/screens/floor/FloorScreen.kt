@@ -174,18 +174,43 @@ fun FloorScreen(
                 items = devices,
                 key = { device -> device.id }
             ) { device ->
-                DeviceCard(
-                    device = device,
-                    onStatusChange = { newStatus ->
-                        repository.updateDeviceStatus(
-                            deviceId = device.id,
-                            status = newStatus,
-                            onError = { message ->
-                                errorMessage = message
-                            }
-                        )
-                    }
-                )
+                if (device.type == DeviceType.MULTI_SWITCH) {
+                    MultiSwitchCard(
+                        device = device,
+                        onMasterSwitchChange = { isOn ->
+                            repository.updateAllSwitches(
+                                device = device,
+                                isOn = isOn,
+                                onError = { message ->
+                                    errorMessage = message
+                                }
+                            )
+                        },
+                        onIndividualSwitchChange = { switchKey, isOn ->
+                            repository.updateIndividualSwitch(
+                                device = device,
+                                switchKey = switchKey,
+                                isOn = isOn,
+                                onError = { message ->
+                                    errorMessage = message
+                                }
+                            )
+                        }
+                    )
+                } else {
+                    DeviceCard(
+                        device = device,
+                        onStatusChange = { newStatus ->
+                            repository.updateDeviceStatus(
+                                deviceId = device.id,
+                                status = newStatus,
+                                onError = { message ->
+                                    errorMessage = message
+                                }
+                            )
+                        }
+                    )
+                }
             }
 
             item {
@@ -289,6 +314,99 @@ private fun DeviceCard(
         }
     }
 }
+
+@Composable
+private fun MultiSwitchCard(
+    device: SmartDevice,
+    onMasterSwitchChange: (Boolean) -> Unit,
+    onIndividualSwitchChange: (String, Boolean) -> Unit
+) {
+    val isMasterOn = device.switchStates.values.any { it }
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(18.dp),
+        elevation = CardDefaults.cardElevation(
+            defaultElevation = 3.dp
+        )
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(18.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Column(
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Text(
+                        text = device.name,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold
+                    )
+
+                    Text(
+                        text = device.roomName,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+
+                    Spacer(modifier = Modifier.height(6.dp))
+
+                    Text(
+                        text = "Master • ${device.status}",
+                        style = MaterialTheme.typography.labelLarge,
+                        color = if (isMasterOn) {
+                            Color(0xFF1B7F3A)
+                        } else {
+                            MaterialTheme.colorScheme.onSurfaceVariant
+                        }
+                    )
+                }
+
+                Switch(
+                    checked = isMasterOn,
+                    onCheckedChange = onMasterSwitchChange
+                )
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            for (number in 1..device.numberOfSwitches) {
+                val switchKey = "switch_$number"
+                val isSwitchOn = device.switchStates[switchKey] ?: false
+
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text(
+                        text = "Switch $number",
+                        style = MaterialTheme.typography.bodyLarge
+                    )
+
+                    Switch(
+                        checked = isSwitchOn,
+                        onCheckedChange = { checked ->
+                            onIndividualSwitchChange(
+                                switchKey,
+                                checked
+                            )
+                        }
+                    )
+                }
+            }
+        }
+    }
+}
+
 
 private fun formatDeviceType(type: DeviceType): String {
     return when (type) {

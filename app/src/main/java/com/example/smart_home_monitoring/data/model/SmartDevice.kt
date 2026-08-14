@@ -10,5 +10,6 @@ data class SmartDevice(
     val gridRow: Int = 0,
     val gridColumn: Int = 0,
     val maxOnDurationMinutes: Int? = null,
-    val numberOfSwitches: Int = 1
+    val numberOfSwitches: Int = 1,
+    val switchStates: Map<String, Boolean> = emptyMap()
 )
