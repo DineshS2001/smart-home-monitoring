@@ -22,6 +22,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.example.smart_home_monitoring.data.model.DeviceStatus
 import com.example.smart_home_monitoring.data.model.SmartDevice
+import java.util.Locale
 
 @Composable
 fun LightScheduleCard(
@@ -64,17 +65,20 @@ fun LightScheduleCard(
                     )
 
                     Text(
-                        text = if (isOn) {
-                            "Light • ON"
-                        } else {
-                            "Light • OFF"
+                        text = when (device.status) {
+                            DeviceStatus.ON -> "Light • ON"
+                            DeviceStatus.OFF -> "Light • OFF"
+                            DeviceStatus.ERROR -> "Light • ERROR"
+                            DeviceStatus.DISCONNECTED -> "Light • DISCONNECTED"
                         },
                         modifier = Modifier.padding(top = 6.dp),
                         style = MaterialTheme.typography.labelLarge,
-                        color = if (isOn) {
-                            Color(0xFF1B7F3A)
-                        } else {
-                            MaterialTheme.colorScheme.onSurfaceVariant
+                        color = when (device.status) {
+                            DeviceStatus.ON -> Color(0xFF1B7F3A)
+                            DeviceStatus.ERROR -> Color(0xFFD32F2F)
+                            DeviceStatus.DISCONNECTED -> Color(0xFFF57C00)
+                            DeviceStatus.OFF ->
+                                MaterialTheme.colorScheme.onSurfaceVariant
                         }
                     )
                 }
@@ -245,5 +249,5 @@ private fun HourSelector(
 }
 
 private fun formatHour(hour: Int): String {
-    return String.format("%02d:00", hour)
+    return String.format(Locale.US, "%02d:00", hour)
 }
