@@ -38,6 +38,7 @@ import com.example.smart_home_monitoring.data.model.SmartDevice
 import com.example.smart_home_monitoring.data.repository.DeviceRealtimeRepository
 import com.example.smart_home_monitoring.ui.theme.SmarthomemonitoringTheme
 import com.example.smart_home_monitoring.ui.components.FloorGrid
+import com.example.smart_home_monitoring.ui.components.CameraMockCard
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -227,42 +228,61 @@ fun FloorScreen(
                 items = devices,
                 key = { device -> device.id }
             ) { device ->
-                if (device.type == DeviceType.MULTI_SWITCH) {
-                    MultiSwitchCard(
-                        device = device,
-                        onMasterSwitchChange = { isOn ->
-                            repository.updateAllSwitches(
-                                device = device,
-                                isOn = isOn,
-                                onError = { message ->
-                                    errorMessage = message
-                                }
-                            )
-                        },
-                        onIndividualSwitchChange = { switchKey, isOn ->
-                            repository.updateIndividualSwitch(
-                                device = device,
-                                switchKey = switchKey,
-                                isOn = isOn,
-                                onError = { message ->
-                                    errorMessage = message
-                                }
-                            )
-                        }
-                    )
-                } else {
-                    DeviceCard(
-                        device = device,
-                        onStatusChange = { newStatus ->
-                            repository.updateDeviceStatus(
-                                device = device,
-                                status = newStatus,
-                                onError = { message ->
-                                    errorMessage = message
-                                }
-                            )
-                        }
-                    )
+                when (device.type) {
+                    DeviceType.CAMERA -> {
+                        CameraMockCard(
+                            device = device,
+                            onStatusChange = { newStatus ->
+                                repository.updateDeviceStatus(
+                                    device = device,
+                                    status = newStatus,
+                                    onError = { message ->
+                                        errorMessage = message
+                                    }
+                                )
+                            }
+                        )
+                    }
+
+                    DeviceType.MULTI_SWITCH -> {
+                        MultiSwitchCard(
+                            device = device,
+                            onMasterSwitchChange = { isOn ->
+                                repository.updateAllSwitches(
+                                    device = device,
+                                    isOn = isOn,
+                                    onError = { message ->
+                                        errorMessage = message
+                                    }
+                                )
+                            },
+                            onIndividualSwitchChange = { switchKey, isOn ->
+                                repository.updateIndividualSwitch(
+                                    device = device,
+                                    switchKey = switchKey,
+                                    isOn = isOn,
+                                    onError = { message ->
+                                        errorMessage = message
+                                    }
+                                )
+                            }
+                        )
+                    }
+
+                    else -> {
+                        DeviceCard(
+                            device = device,
+                            onStatusChange = { newStatus ->
+                                repository.updateDeviceStatus(
+                                    device = device,
+                                    status = newStatus,
+                                    onError = { message ->
+                                        errorMessage = message
+                                    }
+                                )
+                            }
+                        )
+                    }
                 }
             }
 
