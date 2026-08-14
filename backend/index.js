@@ -267,6 +267,12 @@ async function checkLightSchedules() {
       ) {
         continue;
       }
+      if (
+        device.status === "ERROR" ||
+        device.status === "DISCONNECTED"
+      ) {
+        continue;
+      }
 
       const startHour = Number(device.scheduleStartHour);
       const endHour = Number(device.scheduleEndHour);
