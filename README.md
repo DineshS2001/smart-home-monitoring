@@ -147,7 +147,9 @@ The following functions were tested:
 
 ## APK
 
-A debug APK can be generated in Android Studio using:
+Download the latest Android APK:
+
+[Download Smart Home Monitoring APK](https://github.com/DineshS2001/smart-home-monitoring/releases/download/v1.0/app-debug.apk)
 
 ```text
 Build
